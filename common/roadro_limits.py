@@ -1,0 +1,5 @@
+# coding=utf-8
+
+MAX_UPLOADED_IMAGES = 4
+
+THUMBNAIL_SIZE = 210
