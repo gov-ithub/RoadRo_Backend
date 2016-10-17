@@ -3,6 +3,7 @@ from common.base_view import BaseView
 from common.utils import stackTrace
 from common.roadro_errors import BaseError
 from common import http_status as status
+from tickets.serializers import CreateTicketRequestValidator
 import logging
 import ujson
 
@@ -30,11 +31,21 @@ class CreateTicketView(BaseView):
             data = ujson.loads(request.body)
         except Exception as e:
             logger.error(stackTrace(e))
-            return self.render_json_response(BaseError.INTERNAL_SERVER_ERROR, status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return self.render_json_response(BaseError.INVALID_REQUEST, status.HTTP_400_BAD_REQUEST)
 
-        httpResp = request.ticketService.createTicket(request, data)
+        dto = CreateTicketRequestValidator.fromDict(data)
+        if type(dto) is tuple:
+            return self.render_json_response(dto[0], dto[1])
+
+        if request.ticketLimiter.get(dto.access_token):
+            return self.render_json_response(BaseError.CREATE_TICKET_TOO_SOON, status.HTTP_400_BAD_REQUEST)
+
+        httpResp = request.ticketService.createTicket(request, dto)
+
+        request.ticketLimiter.set(dto.access_token)
 
         return self.render_json_response(httpResp[0], statusCode=httpResp[1])
+
 
 class GetTicketView(BaseView):
     """

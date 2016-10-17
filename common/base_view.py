@@ -2,7 +2,8 @@
 import ujson
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, StreamingHttpResponse
+from django.http import HttpResponse
+
 
 class BaseView(View):
     """
@@ -18,16 +19,14 @@ class BaseView(View):
         :param outData: Base response or dictionary to convert in json
         :type outData: BaseResponse, dict
         :param inHeaders: dictionary to append http headers
-        :type inHeaders: dic
+        :type inHeaders: dict
         :param statusCode: http status code
         :type statusCode: int, str
-        :param successCounter
-        :param failCounter
         :return: Http Response
         :rtype: HttpResponse
         """
 
-        serializedResp = ujson.dumps(outData)
+        serializedResp = ujson.dumps(outData, ensure_ascii=False)
 
         httpResp = HttpResponse(serializedResp)
         httpResp['Content-Length'] = len(serializedResp)
@@ -37,33 +36,6 @@ class BaseView(View):
                 httpResp[key] = inHeaders[key]
 
         httpResp.status_code = statusCode
-
-        return httpResp
-
-    def render_response(self, outData, statusCode=None, successCounter=None, failCounter=None):
-        """
-        render a json HTTP response
-        :param outData: Base response or dictionary to convert in json
-        :type outData: BaseResponse, dict
-        :param statusCode: http status code
-        :type statusCode: int, str
-        :param successCounter
-        :param failCounter
-        :return: Http Response
-        :rtype: HttpResponse
-        """
-
-        httpResp = HttpResponse(outData)
-        httpResp['Content-Length'] = len(outData) if outData else 0
-        httpResp['Content-Type'] = "application/json; charset=utf-8"
-
-        httpResp.status_code = statusCode
-
-        if successCounter and statusCode in (201, 200):
-            successCounter.increment()
-
-        if failCounter and statusCode not in (201, 200):
-            failCounter.increment()
 
         return httpResp
 

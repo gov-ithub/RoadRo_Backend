@@ -12,6 +12,25 @@ https://docs.djangoproject.com/en/1.10/ref/settings/
 
 import os
 
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise Exception("DATABASE_URL not configured")
+
+MEDIA_STORAGE_FOLDER = os.getenv("MEDIA_STORAGE_PATH")
+if not MEDIA_STORAGE_FOLDER:
+    raise Exception("Invalid MEDIA_STORAGE_PATH value")
+
+if os.path.exists(MEDIA_STORAGE_FOLDER) is False:
+    raise Exception("The %s folder doesn't exist" % MEDIA_STORAGE_FOLDER)
+
+REDIS_URL = os.getenv("REDIS_URL")
+if not REDIS_URL:
+    raise ValueError("The REDIS_URL value is not set in the environment")
+
+REDIS_POOL_MAX_CONNECTIONS = os.getenv("REDIS_POOL_MAX_CONNECTIONS", 30)
+
+TICKET_LIMITER_EXPIRE_TIME = os.getenv("TICKET_LIMITER_EXPIRE_TIME", 10)
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -20,23 +39,25 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/1.10/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'qcb^fxhxprx4i9qu62%-nh=f#=uj03zv^6edo3dxab@b%4!#mq'
+SECRET_KEY = bytes([int(c, 16) for c in os.getenv("DJANGO_SECRET_KEY", "").split('x') if c != ""])
+if not SECRET_KEY or len(SECRET_KEY) < 50:
+    raise Exception("Invalid or missing DJANGO_SECRET_KEY. Needs to have 50+ chars")
+
+PLATFORM = os.getenv("PLATFORM")
+if not PLATFORM or PLATFORM.lower() not in ("local", "dev", "staging", "prod"):
+    raise Exception("PLATFORM needs to have one of the following values: local, dev, staging, prod")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = True if PLATFORM.lower() == "local" else False
 
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    'tickets',
+    'imgserv',
+    'users'
 ]
 
 MIDDLEWARE = [

@@ -5,7 +5,9 @@ from django.http import HttpResponse, HttpResponseNotFound
 from common.roadro_errors import BaseError
 from users.services import UserService
 from tickets.services import TicketService
+from tickets.ticket_limiter import TicketLimiter
 from common.mongo_connection import MongoConnection
+from roadro import settings as projSettings
 
 class SpringInitializer(object):
     """
@@ -23,11 +25,14 @@ class SpringInitializer(object):
 
         self.initOk = False
 
-        storagePath = os.path.abspath(os.path.dirname(__file__) + "/../media/") + "/"
+        storagePath = projSettings.MEDIA_STORAGE_FOLDER
 
         self.__dbConn = MongoConnection()
         self.__userService = UserService(self.__dbConn)
-        self.__ticketService = TicketService(self.__dbConn, "http://localhost:9000/images/", storagePath)
+        self.__ticketService = TicketService(self.__dbConn, "/images/", storagePath)
+        self.__ticketLimiter = TicketLimiter(projSettings.REDIS_URL,
+                                             projSettings.REDIS_POOL_MAX_CONNECTIONS,
+                                             projSettings.TICKET_LIMITER_EXPIRE_TIME)
 
         self.initOk = True
 
@@ -48,6 +53,7 @@ class SpringInitializer(object):
         if not resp:
             request.userService = self.__userService
             request.ticketService = self.__ticketService
+            request.ticketLimiter = self.__ticketLimiter
             resp = self.get_response(request)
 
         if type(resp) is HttpResponseNotFound:

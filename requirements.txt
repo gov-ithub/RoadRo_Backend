@@ -1,4 +1,4 @@
-django==1.10.1
+django==1.10.2
 ujson==1.35
 pymongo==3.3.0
 Wand==0.4.3

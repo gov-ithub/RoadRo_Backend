@@ -12,8 +12,10 @@ from common import roadro_constants
 from common.utils import stackTrace
 from wand.image import Image
 from bson.objectid import ObjectId
-from tickets.model import ImageModel, CommentModel, TicketModel
-from users.model import UserModel
+from tickets.model import CommentModel, TicketModel
+from imgserv.model import ImageModel
+from users.model import UserModel, TokenModel
+from common.cryptography import Cryptography
 
 
 logger = logging.getLogger(__name__)
@@ -94,74 +96,40 @@ class TicketService(BaseService):
         return {
             "width": newWidth,
             "height": newHeight,
-            "url": self.__image_base_url + prefix+ str(object_id)
+            "url": self.__image_base_url + Cryptography.encryptAES_CFB((prefix + str(object_id)).encode())
         }
 
-    def createTicket(self, request, data):
+    def createTicket(self, request, dto):
         """
 
         :param request:
-        :param data:
+        :param dto:
         :return:
         """
 
-        if "access_token" not in data or type(data["access_token"]) is not str or not data["access_token"].strip():
-            return BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST
-
-        if "images" not in data:
-            return BaseError.MISSING_IMAGES_FIELD, status.HTTP_400_BAD_REQUEST
-
-        if not data["images"] or type(data["images"]) is not list:
-            return BaseError.INVALID_IMAGES_FIELD, status.HTTP_400_BAD_REQUEST
-
-        for image in data["images"]:
-            if type(image) is not str:
-                return BaseError.INVALID_IMAGE_STRING, status.HTTP_400_BAD_REQUEST
-
-        if len(data["images"]) > roadro_limits.MAX_UPLOADED_IMAGES:
-            return BaseError.TOO_MANY_IMAGES, status.HTTP_400_BAD_REQUEST
-
-        if "address" not in data or type(data["address"]) is not str or not data["address"].strip():
-            return BaseError.INVALID_ADDRESS_FIELD, status.HTTP_400_BAD_REQUEST
-
-        if "lat" in data and type(data["lat"]) not in (float, str, int):
-            return BaseError.INVALID_LATITUDE_FIELD, status.HTTP_400_BAD_REQUEST
-
-        if "long" in data and type(data["long"]) not in (float, str, int):
-            return BaseError.INVALID_LONGITUDE_FIELD, status.HTTP_400_BAD_REQUEST
-
-        try:
-            data["long"] = float(data["long"])
-            data["lat"] = float(data["lat"])
-        except Exception as e:
-            logger.error(stackTrace(e))
-            return BaseError.INVALID_LATITUDE_FIELD, status.HTTP_400_BAD_REQUEST
-
-        if "comment" in data and type(data["comment"]) is not str and not data["comment"].strip():
-            return BaseError.INVALID_COMMENT_FIELD, status.HTTP_400_BAD_REQUEST
-
         try:
             # find the user
-            ticket = self.dbConn.get_connection("tokens").find_one({"token": data["access_token"]})
+            ticket = self.dbConn.get_connection(TokenModel).find_one({"token": dto.access_token})
 
             if not ticket:
                 return BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST
 
-            userDict = self.dbConn.get_connection("users").find_one({"_id": ticket["user_id"]})
+            userDict = self.dbConn.get_connection(UserModel).find_one({"_id": ticket["user_id"]})
             user = UserModel.fromDict(userDict)
 
             if not user:
                 return BaseError.USER_NOT_FOUND, status.HTTP_400_BAD_REQUEST
 
-            #decode the images
+            # decode the images
             images = list()
             image_ids = list()
             ticket_id = ObjectId()
             commentId = ObjectId()
-            for imageData in data["images"]:
+            for imageData in dto.images:
                 image = base64.b64decode(imageData)
                 mime_type = magic.from_buffer(image, mime=True)
-                if "image" not in mime_type:
+                if "image" not in mime_type or\
+                        ("png" not in mime_type and "jpg" not in mime_type and "jpeg" not in mime_type):
                     return BaseError.FILE_TYPE_NOT_SUPPORTED, status.HTTP_400_BAD_REQUEST
 
                 try:
@@ -174,7 +142,7 @@ class TicketService(BaseService):
                         thumbnail = self.__imageResize(_id, img, roadro_limits.THUMBNAIL_SIZE)
 
                         imgModel = ImageModel()
-                        imgModel.url = self.__image_base_url + str(_id)
+                        imgModel.url = self.__image_base_url + Cryptography.encryptAES_CFB(str(_id).encode())
                         imgModel.width = img.width
                         imgModel.height = img.height
                         imgModel.metadata = thumbnail
@@ -190,40 +158,42 @@ class TicketService(BaseService):
                     return BaseError.INTERNAL_SERVER_ERROR, status.HTTP_500_INTERNAL_SERVER_ERROR
 
             for image in images:
-                self.dbConn.get_connection("images").insert_one(image)
+                self.dbConn.get_connection(ImageModel).insert_one(image)
 
             commentModel = None
-            if data["comment"]:
+            if dto.comment:
                 commentModel = CommentModel()
                 commentModel.id = commentId
                 commentModel.user_id = user.id
-                commentModel.text = data["comment"]
+                commentModel.text = dto.comment
                 commentModel.ticket_id = ticket_id
                 commentModel.created_date = datetime.datetime.utcnow()
-                self.dbConn.get_connection("comments").insert(commentModel.toDict())
+                self.dbConn.get_connection(CommentModel).insert(commentModel.toDict())
 
             ticketModel = TicketModel()
             ticketModel.user_id = user.id
             ticketModel.id = ticket_id
             ticketModel.image_ids = image_ids
-            ticketModel.comment_ids = [commentId] if data["comment"] else []
-            ticketModel.address = data["address"]
-            ticketModel.latitude = data.get("lat")
-            ticketModel.longitude = data.get("longitude")
+            ticketModel.comment_ids = [commentId] if dto.comment else []
+            ticketModel.address = dto.address
+            ticketModel.latitude = dto.lat
+            ticketModel.longitude = dto.long
             ticketModel.resolution = TicketModel.UNASIGNED
             ticketModel.created_date = datetime.datetime.utcnow()
 
-            self.dbConn.get_connection("tickets").insert(ticketModel.toDict())
+            self.dbConn.get_connection(TicketModel).insert(ticketModel.toDict())
 
             resp = dict(response=dict())
 
+            hostname = ("https://" if request.is_secure() else "http://") + request.get_host()
+
             resp["response"] = {
-                "id": str(ticket_id),
+                "id": Cryptography.encryptAES_CFB(str(ticket_id).encode()),
                 "images": [
                     {
-                        "orig_url": image["url"],
+                        "orig_url": hostname + image["url"],
                         "thumb": {
-                            "url": image["metadata"]["url"],
+                            "url": hostname + image["metadata"]["url"],
                             "width": image["metadata"]["width"],
                             "height": image["metadata"]["height"]
                         }

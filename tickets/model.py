@@ -7,11 +7,12 @@ class CommentModel(object):
     """
     ID = "_id"
     USER_ID = "user_id"
-    STAFF_ID = "staff_id"
     TICKET_ID = "ticket_id"
     TEXT = "text"
     HIDDEN = "hidden"
     CREATED_DATE = "created_date"
+
+    collection = "comments"
 
     def __init__(self):
         """
@@ -19,7 +20,6 @@ class CommentModel(object):
         self.id = None
         self.user_id = None
         self.text = None
-        self.staff_id = None
         self.hidden = None
         self.created_date = None
         self.ticket_id = None
@@ -34,7 +34,6 @@ class CommentModel(object):
 
         dictModel[self.ID] = self.id
         dictModel[self.USER_ID] = self.user_id
-        dictModel[self.STAFF_ID] = self.staff_id
         dictModel[self.TEXT] = self.text
         dictModel[self.HIDDEN] = self.hidden
         dictModel[self.CREATED_DATE] = self.created_date
@@ -51,79 +50,11 @@ class CommentModel(object):
 
         model = TicketModel()
         model.id = dictModel.get(cls.ID)
-        model.staff_id = dictModel.get(cls.STAFF_ID)
         model.user_id = dictModel.get(cls.USER_ID)
         model.text = dictModel.get(cls.TEXT)
         model.hidden = dictModel.get(cls.HIDDEN)
         model.ticket_id = dictModel.get(cls.TICKET_ID)
         model.created_date = dictModel.get(cls.CREATED_DATE)
-
-        return model
-
-
-
-class ImageModel(object):
-    """
-
-    """
-
-    ID = "_id"
-    USER_ID = "user_id"
-    URL = "url"
-    METADATA = "metadata"
-    WIDTH = "width"
-    HEIGHT = "height"
-    TICKET_ID = "ticket_id"
-    MIMETYPE = "mimetype"
-
-    def __init__(self):
-        """
-        """
-        self.id = None
-        self.user_id = None
-        self.url = None
-        self.metadata = None
-        self.width = None
-        self.height = None
-        self.ticket_id = None
-        self.mimetype = None
-
-
-    def toDict(self):
-        """
-
-        :return:
-        """
-
-        dictModel = dict()
-
-        dictModel[self.ID] = self.id
-        dictModel[self.USER_ID] = self.user_id
-        dictModel[self.URL] = self.url
-        dictModel[self.METADATA] = self.metadata
-        dictModel[self.WIDTH] = self.width
-        dictModel[self.HEIGHT] = self.height
-        dictModel[self.TICKET_ID] = self.ticket_id
-        dictModel[self.MIMETYPE] = self.mimetype
-
-        return dictModel
-
-    @classmethod
-    def fromDict(cls, dictModel):
-        """
-
-        :return:
-        """
-
-        model = TicketModel()
-        model.id = dictModel.get(cls.ID)
-        model.url = dictModel.get(cls.URL)
-        model.metadata = dictModel.get(cls.METADATA)
-        model.width = dictModel.get(cls.WIDTH)
-        model.height = dictModel.get(cls.HEIGHT)
-        model.ticket_id = dictModel.get(cls.TICKET_ID)
-        model.user_id = dictModel.get(cls.USER_ID)
-        model.mimetype = dictModel.get(cls.MIMETYPE)
 
         return model
 
@@ -149,6 +80,8 @@ class TicketModel(object):
     UNASIGNED = 0
     IN_PROGRESS = 10
     RESOLVED = 30
+
+    collection = "tickets"
 
     def __init__(self):
         """

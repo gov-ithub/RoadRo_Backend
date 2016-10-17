@@ -1,6 +1,7 @@
 # coding=utf-8
 from common.base_view import BaseView
 from common.utils import stackTrace
+from users.serializers import RegisterUserRequestValidator
 import logging
 import ujson
 
@@ -30,8 +31,12 @@ class RegistrationView(BaseView):
         except Exception as e:
             logger.error(stackTrace(e))
 
+        dto = RegisterUserRequestValidator.fromDict(data)
 
-        httpResp = request.userService.registerUser(request, data)
+        if type(dto) is tuple:
+            return self.render_json_response(dto[0], dto[1])
+
+        httpResp = request.userService.registerUser(request, dto)
 
         return self.render_json_response(httpResp[0], httpResp[1])
 
