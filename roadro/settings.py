@@ -50,7 +50,8 @@ if not PLATFORM or PLATFORM.lower() not in ("local", "dev", "staging", "prod"):
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True if PLATFORM.lower() == "local" else False
 
-ALLOWED_HOSTS = []
+# for now leave *. to be changed when we get a domain
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 

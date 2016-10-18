@@ -3,7 +3,7 @@ from common.base_view import BaseView
 from common.utils import stackTrace
 from common.roadro_errors import BaseError
 from common import http_status as status
-from tickets.serializers import CreateTicketRequestValidator
+from tickets.serializers import CreateTicketRequestValidator, GetMyTicketsRequestValidator
 import logging
 import ujson
 
@@ -89,9 +89,16 @@ class GetMyTicketsView(BaseView):
         """
 
         data = dict()
+        access_token = request.META.get("HTTP_AUTHORIZATION")
+        if not access_token:
+            return self.render_json_response(BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST)
 
-        data.update(kwargs)
+        data["access_token"] = access_token
 
-        httpResp = request.ticketService.getMyTickets(request, data)
+        dto = GetMyTicketsRequestValidator.fromDict(data)
+        if type(dto) is tuple:
+            return self.render_json_response(dto[0], dto[1])
+
+        httpResp = request.ticketService.getMyTickets(request, dto)
 
         return self.render_json_response(httpResp[0], httpResp[1])

@@ -51,3 +51,20 @@ class CreateTicketRequestValidator(RequestDTOValidator):
         self.lat = None
         self.long = None
         self.comment = None
+
+
+class GetMyTicketsRequestValidator(RequestDTOValidator):
+
+    rulesDict = {
+        "access_token": ItemValidator(funcList=[isString, str.strip, isStringNotEmpty],
+                                      errorCode=(BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST))
+
+    }
+
+    def __init__(self):
+        """
+
+        """
+        super(GetMyTicketsRequestValidator, self).__init__()
+
+        self.access_token = None

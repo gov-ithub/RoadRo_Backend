@@ -1,6 +1,5 @@
 # coding=utf-8
 import ujson
-import os
 from django.http import HttpResponse, HttpResponseNotFound
 from common.roadro_errors import BaseError
 from users.services import UserService

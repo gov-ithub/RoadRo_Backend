@@ -148,6 +148,7 @@ class TicketService(BaseService):
                         imgModel.metadata = thumbnail
                         imgModel.ticket_id = ticket_id
                         imgModel.mimetype = mime_type
+                        imgModel.user_id = user.id
                         imgModel.id = _id
 
                         image_ids.append(_id)
@@ -221,12 +222,23 @@ class TicketService(BaseService):
 
         return {"error": {"code": 1000, "message": "Not implemented yet"}}, status.HTTP_400_BAD_REQUEST
 
-    def getMyTickets(self, request, data):
+    def getMyTickets(self, request, dto):
         """
 
         :param request:
-        :param data:
+        :param dto:
         :return:
         """
 
-        return {"error": {"code": 1000, "message": "Not implemented yet"}}, status.HTTP_400_BAD_REQUEST
+        try:
+
+            tokenModel = self.dbConn.get_connection(TokenModel).find_one({"token": dto.access_token})
+            if not tokenModel:
+                return BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST
+
+
+
+            return {"error": {"code": 1000, "message": "Not implemented yet"}}, status.HTTP_400_BAD_REQUEST
+        except Exception as e:
+            logger.error(stackTrace(e))
+            return BaseError.INTERNAL_SERVER_ERROR, status.HTTP_500_INTERNAL_SERVER_ERROR

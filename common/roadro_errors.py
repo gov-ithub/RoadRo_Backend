@@ -13,6 +13,7 @@ class BaseError(object):
     RESOURCE_NOT_FOUND = {"error": {"code": 400, "message": "page not found"}}
     USER_NOT_FOUND = {"error": {"code": 401, "message": "The user wasn't found"}}
     FILE_NOT_FOUND = {"error": {"code": 402, "message": "The file was not found"}}
+    IMAGE_NOT_FOUND = {"error": {"code": 403, "message": "The image was not found"}}
 
     INVALID_PHONE = {"error": {"code": 200, "message": "the phone field is invalid"}}
     INVALID_TOKEN = {"error": {"code": 201, "message": "the token is invalid"}}
