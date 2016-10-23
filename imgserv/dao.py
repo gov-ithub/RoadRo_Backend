@@ -48,3 +48,16 @@ class ImagesDao(object):
                 respDict[image[ImageModel.TICKET_ID]] = [image]
 
         return respDict
+
+    def getImageById(self, db_id, user_id):
+        """
+
+        :param db_id:
+        :param user_id:
+        :return:
+        """
+        resp = self.dbConn.find_one({ImageModel.ID: db_id, ImageModel.USER_ID: user_id})
+        if resp:
+            return ImageModel.fromDict(resp)
+
+        return None

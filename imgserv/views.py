@@ -31,7 +31,7 @@ class ImgServeView(BaseView):
             if not access_token:
                 return self.render_json_response(BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST)
 
-            result = request.ticketService.dbConn.get_connection(TokenModel).find_one({"token": access_token})
+            result = request.ticketService.daoRegistry.tokensDao.getToken(access_token)
             if not result:
                 return self.render_json_response(BaseError.USER_NOT_FOUND, status.HTTP_400_BAD_REQUEST)
 
@@ -42,15 +42,14 @@ class ImgServeView(BaseView):
                 dbId = db_id[index+1:]
             else:
                 dbId = db_id
-            imgDict = request.ticketService.dbConn.get_connection(ImageModel).find_one({"_id": ObjectId(dbId),
-                                                                                        "user_id": result["user_id"]})
+            imgModel = request.ticketService.daoRegistry.imagesDao.getImageById(ObjectId(dbId), result.user_id)
 
-            if not imgDict:
+            if not imgModel:
                 return self.render_json_response(BaseError.IMAGE_NOT_FOUND, status.HTTP_400_BAD_REQUEST)
 
             path = "%s%s/%s/%s" % (request.ticketService.base_img_path, dbId[-2:], dbId[-4:-2], db_id)
 
-            return self.render_file(path, imgDict["mimetype"])
+            return self.render_file(path, imgModel.mimetype)
         except Exception as e:
             logger.error(stackTrace(e))
             return self.render_json_response(BaseError.FILE_NOT_FOUND, status.HTTP_404_NOT_FOUND)
