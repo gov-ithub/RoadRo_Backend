@@ -14,6 +14,7 @@ class BaseError(object):
     USER_NOT_FOUND = {"error": {"code": 401, "message": "The user wasn't found"}}
     FILE_NOT_FOUND = {"error": {"code": 402, "message": "The file was not found"}}
     IMAGE_NOT_FOUND = {"error": {"code": 403, "message": "The image was not found"}}
+    TICKET_NOT_FOUND = {"error": {"code": 404, "message": "The ticket was not found"}}
 
     INVALID_PHONE = {"error": {"code": 200, "message": "the phone field is invalid"}}
     INVALID_TOKEN = {"error": {"code": 201, "message": "the token is invalid"}}
@@ -27,11 +28,16 @@ class BaseError(object):
     INVALID_IMAGE = {"error": {"code": 209, "message": "The image is invalid"}}
     INVALID_REQUEST = {"error": {"code": 210, "message": "the request is invalid. please check the parameters you are sending"}}
     INVALID_DEVICE_ID = {"error": {"code": 211, "message": "the device_id field is invalid"}}
+    INVALID_OFFSET = {"error": {"code": 212, "message": "The offset is invalid"}}
+    INVALID_LIMIT = {"error": {"code": 213, "message": "The limit is invalid"}}
+    INVALID_TICKET_ID = {"error": {"code": 214, "message": "The ticket id is invalid"}}
 
     FILE_TYPE_NOT_SUPPORTED = {"error": {"code": 0, "message": "The file type is not supported. Send only jpg or png images"}}
     STRING_TOO_LONG = {"error": {"code": 1, "message": "The string is too long"}}
     USER_ALREADY_REGISTERED = {"error": {"code": 2, "message": "The user is already registered"}}
     CREATE_TICKET_TOO_SOON = {"error": {"code": 3, "message": "Please wait 10 seconds before posting another ticket"}}
+    TICKET_ALREADY_LIKED = {"error": {"code": 4, "message": "You already liked the ticket"}}
+    TICKET_NOT_LIKED = {"error": {"code": 5, "message": "The ticket was not previously liked by you to unlike now"}}
 
 
 

@@ -115,3 +115,20 @@ def serializerToBool(obj):
     :return:
     """
     return safeToBool(obj), True
+
+
+def encode(obj):
+    """
+
+    :param obj:
+    :return:
+    """
+    return obj.encode()
+
+
+def likeActionChoice(obj):
+
+    if obj in ("like", "unlike"):
+        return True
+
+    return False

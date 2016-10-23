@@ -12,10 +12,10 @@ from common import roadro_constants
 from common.utils import stackTrace
 from wand.image import Image
 from bson.objectid import ObjectId
-from tickets.model import CommentModel, TicketModel
+from tickets.model import CommentModel, TicketModel, LikeModel
 from imgserv.model import ImageModel
-from users.model import UserModel, TokenModel
 from common.cryptography import Cryptography
+from tickets.serializers import TicketResponseDTO
 
 
 logger = logging.getLogger(__name__)
@@ -26,14 +26,18 @@ class TicketService(BaseService):
     services for tickets
     """
 
-    def __init__(self, dbConnection, image_base_url, storage_path):
+    def __init__(self, daoRegistry, image_base_url, storage_path):
         """
 
-        :param dbConnection:
+        :param daoRegistry:
+        :param image_base_url:
+        :param storage_path:
         """
-        super(TicketService, self).__init__(dbConnection)
+        super(TicketService, self).__init__(daoRegistry)
         self.__image_base_url = image_base_url
         self.base_img_path = storage_path
+        self.MAX_FETCHED_TICKETS_COUNT = 30
+        self.MAX_FETCHED_COMMENTS_COUNT = 10
 
     def __writeImage(self, binary_buffer, object_id):
         """
@@ -96,7 +100,7 @@ class TicketService(BaseService):
         return {
             "width": newWidth,
             "height": newHeight,
-            "url": self.__image_base_url + Cryptography.encryptAES_CFB((prefix + str(object_id)).encode())
+            "url": self.__image_base_url + Cryptography.simpleEncryption((prefix + str(object_id)).encode())
         }
 
     def createTicket(self, request, dto):
@@ -109,13 +113,12 @@ class TicketService(BaseService):
 
         try:
             # find the user
-            ticket = self.dbConn.get_connection(TokenModel).find_one({"token": dto.access_token})
+            tokenModel = self.daoRegistry.tokensDao.getToken(dto.access_token)
 
-            if not ticket:
+            if not tokenModel:
                 return BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST
 
-            userDict = self.dbConn.get_connection(UserModel).find_one({"_id": ticket["user_id"]})
-            user = UserModel.fromDict(userDict)
+            user = self.daoRegistry.usersDao.getUserById(tokenModel.user_id)
 
             if not user:
                 return BaseError.USER_NOT_FOUND, status.HTTP_400_BAD_REQUEST
@@ -142,7 +145,7 @@ class TicketService(BaseService):
                         thumbnail = self.__imageResize(_id, img, roadro_limits.THUMBNAIL_SIZE)
 
                         imgModel = ImageModel()
-                        imgModel.url = self.__image_base_url + Cryptography.encryptAES_CFB(str(_id).encode())
+                        imgModel.url = self.__image_base_url + Cryptography.simpleEncryption(str(_id).encode())
                         imgModel.width = img.width
                         imgModel.height = img.height
                         imgModel.metadata = thumbnail
@@ -158,8 +161,7 @@ class TicketService(BaseService):
                     logger.error(stackTrace(e))
                     return BaseError.INTERNAL_SERVER_ERROR, status.HTTP_500_INTERNAL_SERVER_ERROR
 
-            for image in images:
-                self.dbConn.get_connection(ImageModel).insert_one(image)
+            self.daoRegistry.imagesDao.create(images)
 
             commentModel = None
             if dto.comment:
@@ -169,27 +171,26 @@ class TicketService(BaseService):
                 commentModel.text = dto.comment
                 commentModel.ticket_id = ticket_id
                 commentModel.created_date = datetime.datetime.utcnow()
-                self.dbConn.get_connection(CommentModel).insert(commentModel.toDict())
+                self.daoRegistry.commentsDao.create(commentModel)
 
             ticketModel = TicketModel()
             ticketModel.user_id = user.id
             ticketModel.id = ticket_id
             ticketModel.image_ids = image_ids
-            ticketModel.comment_ids = [commentId] if dto.comment else []
             ticketModel.address = dto.address
             ticketModel.latitude = dto.lat
             ticketModel.longitude = dto.long
             ticketModel.resolution = TicketModel.UNASIGNED
             ticketModel.created_date = datetime.datetime.utcnow()
 
-            self.dbConn.get_connection(TicketModel).insert(ticketModel.toDict())
+            self.daoRegistry.ticketsDao.create(ticketModel)
 
             resp = dict(response=dict())
 
             hostname = ("https://" if request.is_secure() else "http://") + request.get_host()
 
             resp["response"] = {
-                "id": Cryptography.encryptAES_CFB(str(ticket_id).encode()),
+                "id": Cryptography.simpleEncryption(str(ticket_id).encode()),
                 "images": [
                     {
                         "orig_url": hostname + image["url"],
@@ -203,7 +204,8 @@ class TicketService(BaseService):
                 "lat": ticketModel.latitude,
                 "long": ticketModel.longitude,
                 "comment": commentModel.text if commentModel else None,
-                "likes": 0
+                "likes": 0,
+                "liked_by_me": False
             }
 
             return resp, status.HTTP_200_OK
@@ -211,16 +213,50 @@ class TicketService(BaseService):
             logger.error(stackTrace(e))
             return BaseError.INTERNAL_SERVER_ERROR, status.HTTP_500_INTERNAL_SERVER_ERROR
 
-
-    def getTicket(self, request, data):
+    def getTicket(self, request, dto):
         """
 
         :param request:
-        :param data:
+        :param dto:
         :return:
         """
 
-        return {"error": {"code": 1000, "message": "Not implemented yet"}}, status.HTTP_400_BAD_REQUEST
+        try:
+            tokenModel = self.daoRegistry.tokensDao.getToken(dto.access_token)
+            if not tokenModel:
+                return BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST
+
+            user = self.daoRegistry.usersDao.getUserById(tokenModel.user_id)
+
+            if not user:
+                return BaseError.USER_NOT_FOUND, status.HTTP_400_BAD_REQUEST
+
+            ticket = self.daoRegistry.ticketsDao.getTicketById(ObjectId(dto.ticket_id), user.id)
+
+            if not ticket:
+                return BaseError.TICKET_NOT_FOUND, status.HTTP_400_BAD_REQUEST
+
+            commentDict = self.daoRegistry.commentsDao.getCommentsForTickets([ticket.id], user.id,
+                                                                             limit=self.MAX_FETCHED_COMMENTS_COUNT)
+
+            likedByMeDict = self.daoRegistry.likesDao.getLikedByMe([ticket.id], user.id)
+
+            hostname = ("https://" if request.is_secure() else "http://") + request.get_host()
+            imagesDict = self.daoRegistry.imagesDao.getImages(ticket.image_ids, hostname)
+
+            respDict = dict(response=dict())
+
+            data = ticket.toDict()
+            data["comments"] = commentDict.get(ticket.id)
+            data["liked_by_me"] = likedByMeDict.get(ticket.id, False)
+            data["images"] = imagesDict.get(ticket.id, [])
+
+            respDict["response"]["ticket"] = TicketResponseDTO.fromDict(data)
+
+            return respDict, 200
+        except Exception as e:
+            logger.error(stackTrace(e))
+            return BaseError.INTERNAL_SERVER_ERROR, status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def getMyTickets(self, request, dto):
         """
@@ -232,13 +268,100 @@ class TicketService(BaseService):
 
         try:
 
-            tokenModel = self.dbConn.get_connection(TokenModel).find_one({"token": dto.access_token})
+            limit = dto.limit
+            if dto.limit > self.MAX_FETCHED_TICKETS_COUNT:
+                limit = self.MAX_FETCHED_TICKETS_COUNT
+
+            if dto.offset < 0:
+                return BaseError.INVALID_OFFSET, status.HTTP_400_BAD_REQUEST
+
+            tokenModel = self.daoRegistry.tokensDao.getToken(dto.access_token)
             if not tokenModel:
                 return BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST
 
+            user = self.daoRegistry.usersDao.getUserById(tokenModel.user_id)
 
+            if not user:
+                return BaseError.USER_NOT_FOUND, status.HTTP_400_BAD_REQUEST
 
-            return {"error": {"code": 1000, "message": "Not implemented yet"}}, status.HTTP_400_BAD_REQUEST
+            tickets = self.daoRegistry.ticketsDao.getMyTickets(user_id=user.id, limit=limit, offset=dto.offset)
+
+            ticketIds = list()
+            imageIds = list()
+            for ticket in tickets:
+                imageIds += ticket.image_ids
+                ticketIds.append(ticket.id)
+
+            commentDict = self.daoRegistry.commentsDao.getCommentsForTickets(ticketIds, user.id,
+                                                                             limit=self.MAX_FETCHED_COMMENTS_COUNT)
+
+            likedByMeDict = self.daoRegistry.likesDao.getLikedByMe(ticketIds, user.id)
+
+            hostname = ("https://" if request.is_secure() else "http://") + request.get_host()
+            imagesDict = self.daoRegistry.imagesDao.getImages(imageIds, hostname)
+
+            respDict = dict(response=dict())
+
+            ticketList = list()
+
+            for ticket in tickets:
+                data = ticket.toDict()
+                data["comments"] = commentDict.get(ticket.id)
+                data["liked_by_me"] = likedByMeDict.get(ticket.id, False)
+                data["images"] = imagesDict.get(ticket.id, [])
+                ticketList.append(TicketResponseDTO.fromDict(data))
+
+            respDict["response"]["tickets"] = ticketList
+
+            return respDict, 200
+        except Exception as e:
+            logger.error(stackTrace(e))
+            return BaseError.INTERNAL_SERVER_ERROR, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    def likeTicket(self, request, dto):
+        """
+
+        :param request:
+        :param dto:
+        :return:
+        """
+
+        try:
+            tokenModel = self.daoRegistry.tokensDao.getToken(dto.access_token)
+            if not tokenModel:
+                return BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST
+
+            user = self.daoRegistry.usersDao.getUserById(tokenModel.user_id)
+
+            if not user:
+                return BaseError.USER_NOT_FOUND, status.HTTP_400_BAD_REQUEST
+
+            ticket_id = ObjectId(dto.ticket_id)
+            ticket = self.daoRegistry.ticketsDao.getTicketById(ticket_id)
+
+            if not ticket:
+                return BaseError.TICKET_NOT_FOUND, status.HTTP_400_BAD_REQUEST
+
+            likeModel = self.daoRegistry.likesDao.getLike(ticket_id, user.id)
+            if dto.action_type == "like":
+                if likeModel:
+                    return BaseError.TICKET_ALREADY_LIKED, status.HTTP_400_BAD_REQUEST
+
+                likeModel = LikeModel()
+                likeModel.ticket_id = ticket_id
+                likeModel.user_id = user.id
+                likeModel.created_date = datetime.datetime.utcnow()
+
+                self.daoRegistry.likesDao.create(likeModel)
+                self.daoRegistry.ticketsDao.incrementLike(ticket_id, 1)
+            elif dto.action_type == "unlike":
+                if not likeModel:
+                    return BaseError.TICKET_NOT_LIKED, status.HTTP_400_BAD_REQUEST
+
+                self.daoRegistry.likesDao.deleteLike(likeModel.id)
+                self.daoRegistry.ticketsDao.incrementLike(ticket_id, -1)
+
+            return {"response": {}}, status.HTTP_200_OK
         except Exception as e:
             logger.error(stackTrace(e))
             return BaseError.INTERNAL_SERVER_ERROR, status.HTTP_500_INTERNAL_SERVER_ERROR

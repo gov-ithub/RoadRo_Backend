@@ -20,6 +20,7 @@ class Cryptography(object):
     class that will have static methods to encrypt and decrypt
     """
     AES_PASSWD = projSettings.SECRET_KEY[:32]
+    IV = projSettings.AES_IV
 
     @classmethod
     def padPkcs7(cls, message):
@@ -33,6 +34,24 @@ class Cryptography(object):
         data = message + bytes([length]) * length
 
         return data
+
+    @classmethod
+    def simpleEncryption(cls, message):
+        """
+        encrypts the message with AES_CFB encryption algorithm
+        :param message: the message to be encrypted
+        :return: the encrypted message in hexadecimal format
+        :rtype string
+        """
+
+        paddedMessage = cls.padPkcs7(message)
+        temp = base64.b64encode(cls.IV +
+                                AES.new(
+                                    cls.AES_PASSWD,
+                                    AES.MODE_CFB,
+                                    cls.IV).encrypt(paddedMessage))
+        temp = temp.decode().replace('+', '-').replace('/', '_')
+        return temp
 
     @classmethod
     def encryptAES_CFB(cls, message):

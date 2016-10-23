@@ -16,6 +16,9 @@ class UserModel(object):
 
     collection = "users"
 
+    DEVICE_ID = "device_id"
+    IS_VALID = "is_valid"
+
     NORMAL_USER = 0
     POLICE_AGENT = 10
     DISPATCHER = 20

@@ -3,7 +3,8 @@ from common.base_view import BaseView
 from common.utils import stackTrace
 from common.roadro_errors import BaseError
 from common import http_status as status
-from tickets.serializers import CreateTicketRequestValidator, GetMyTicketsRequestValidator
+from tickets.serializers import CreateTicketRequestValidator, GetMyTicketsRequestValidator, LikeTicketRequestValidator
+from tickets.serializers import GetTicketByIdRequestValidator
 import logging
 import ujson
 
@@ -63,13 +64,20 @@ class GetTicketView(BaseView):
         :return:
         """
         data = dict()
+        access_token = request.META.get("HTTP_AUTHORIZATION")
+        if not access_token:
+            return self.render_json_response(BaseError.INVALID_TOKEN, status.HTTP_400_BAD_REQUEST)
+
+        data["access_token"] = access_token
         data.update(kwargs)
-        for key in request.GET:
-            data[key] = request.GET.get(key)
 
-        httpResp = request.ticketService.getTicket(request, data)
+        dto = GetTicketByIdRequestValidator.fromDict(data)
+        if type(dto) is tuple:
+            return self.render_json_response(dto[0], dto[1])
 
-        return self.render_json_response(httpResp[0], statusCode=httpResp[1])
+        httpResp = request.ticketService.getTicket(request, dto)
+
+        return self.render_json_response(httpResp[0], httpResp[1])
 
 
 class GetMyTicketsView(BaseView):
@@ -102,3 +110,38 @@ class GetMyTicketsView(BaseView):
         httpResp = request.ticketService.getMyTickets(request, dto)
 
         return self.render_json_response(httpResp[0], httpResp[1])
+
+
+class LikeTicketView(BaseView):
+    """
+
+    """
+
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        """
+
+        :param request:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
+        data = dict()
+        data.update(kwargs)
+
+        try:
+            data.update(ujson.loads(request.body))
+        except Exception as e:
+            logger.debug(stackTrace(e))
+            return self.render_json_response(BaseError.INVALID_REQUEST, status.HTTP_400_BAD_REQUEST)
+
+        dto = LikeTicketRequestValidator.fromDict(data)
+
+        if type(dto) is tuple:
+            return self.render_json_response(dto[0], dto[1])
+
+        resp = request.ticketService.likeTicket(request, dto)
+
+        return self.render_json_response(resp[0], resp[1])

@@ -6,11 +6,11 @@ class BaseService(object):
 
     """
 
-    def __init__(self, databaseConnection):
+    def __init__(self, daoRegistry):
         """
 
         """
 
-        self.dbConn = databaseConnection
+        self.daoRegistry = daoRegistry
 
 

@@ -2,11 +2,15 @@
 import ujson
 from django.http import HttpResponse, HttpResponseNotFound
 from common.roadro_errors import BaseError
+from common.dao_registry import DaoRegistry
 from users.services import UserService
+from users.dao import UsersDao, TokensDao
+from tickets.dao import TicketsDao, CommentsDao, LikesDao
 from tickets.services import TicketService
 from tickets.ticket_limiter import TicketLimiter
 from common.mongo_connection import MongoConnection
 from roadro import settings as projSettings
+from imgserv.dao import ImagesDao
 
 class SpringInitializer(object):
     """
@@ -27,14 +31,28 @@ class SpringInitializer(object):
         storagePath = projSettings.MEDIA_STORAGE_FOLDER
 
         self.__dbConn = MongoConnection()
-        self.__userService = UserService(self.__dbConn)
-        self.__ticketService = TicketService(self.__dbConn, "/images/", storagePath)
+        usersDao = UsersDao(self.__dbConn)
+        ticketsDao = TicketsDao(self.__dbConn)
+        tokensDao = TokensDao(self.__dbConn)
+        commentsDao = CommentsDao(self.__dbConn)
+        likesDao = LikesDao(self.__dbConn)
+        imagesDao = ImagesDao(self.__dbConn)
+
+        daoRegistry = DaoRegistry()
+        daoRegistry.usersDao = usersDao
+        daoRegistry.ticketsDao = ticketsDao
+        daoRegistry.tokensDao = tokensDao
+        daoRegistry.commentsDao = commentsDao
+        daoRegistry.likesDao = likesDao
+        daoRegistry.imagesDao = imagesDao
+
+        self.__userService = UserService(daoRegistry)
+        self.__ticketService = TicketService(daoRegistry, "/images/", storagePath)
         self.__ticketLimiter = TicketLimiter(projSettings.REDIS_URL,
                                              projSettings.REDIS_POOL_MAX_CONNECTIONS,
                                              projSettings.TICKET_LIMITER_EXPIRE_TIME)
 
         self.initOk = True
-
 
     def __call__(self, request):
         """

@@ -41,7 +41,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = bytes([int(c, 16) for c in os.getenv("DJANGO_SECRET_KEY", "").split('x') if c != ""])
 if not SECRET_KEY or len(SECRET_KEY) < 50:
-    raise Exception("Invalid or missing DJANGO_SECRET_KEY. Needs to have 50+ chars")
+    raise Exception("Invalid or missing DJANGO_SECRET_KEY. Needs to have 50+ bytes")
+
+AES_IV = bytes([int(c, 16) for c in os.getenv("AES_IV", "").split('x') if c != ""])
+if not AES_IV or len(AES_IV) != 16:
+    raise Exception("Invalid or missing AES_IV. Needs to have 16 bytes")
 
 PLATFORM = os.getenv("PLATFORM")
 if not PLATFORM or PLATFORM.lower() not in ("local", "dev", "staging", "prod"):

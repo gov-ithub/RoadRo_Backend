@@ -38,41 +38,6 @@ class DTOConverter(object):
     stringifyDict = dict()
 
     @classmethod
-    def fromModel(cls, model):
-        """
-
-        :param model:
-        :return:
-        """
-        respDict = dict()
-
-        for key in cls.stringifyDict:
-            obj = None
-            try:
-                obj = getattr(model, key)
-            except AttributeError:
-                pass
-            if cls.stringifyDict[key].optional is True and obj is None:
-                if cls.stringifyDict[key].default is not None:
-                    respDict[cls.stringifyDict[key].externalName or key] = cls.stringifyDict[key].default
-                continue
-            objType = cls.stringifyDict[key].objType
-            externalName = cls.stringifyDict[key].externalName
-            if objType is None:
-                for v in cls.stringifyDict[key].modifiers:
-                    obj = v(obj)
-                respDict[externalName or key] = obj
-            elif objType == ItemConverter.ITERATOR:
-                dtoType = cls.stringifyDict[key].itemClass
-                respDict[externalName or key] = list()
-                for val in obj:
-                    respDict[externalName or key].append(dtoType.fromModel(val))
-            else:
-                respDict[externalName or key] = cls.stringifyDict[key].fromModel(obj)
-
-        return respDict
-
-    @classmethod
     def fromDict(cls, dataDict):
         """
 
@@ -98,12 +63,12 @@ class DTOConverter(object):
                     dtoType = cls.stringifyDict[key].itemClass
                     respDict[externalName or key] = list()
                     for val in obj:
-                        respDict[externalName or key].append(dtoType.fromSocrativeDict(val))
+                        respDict[externalName or key].append(dtoType.fromDict(val))
                 elif objType == ItemConverter.SINGLE:
                     dtoType = cls.stringifyDict[key].itemClass
-                    respDict[externalName or key] = dtoType.fromSocrativeDict(obj)
+                    respDict[externalName or key] = dtoType.fromDict(obj)
                 else:
-                    respDict[externalName or key] = cls.stringifyDict[key].fromSocrativeDict(obj)
+                    respDict[externalName or key] = cls.stringifyDict[key].fromDict(obj)
 
             return respDict
         except Exception as e:

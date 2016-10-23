@@ -12,18 +12,18 @@ import datetime
 
 logger = logging.getLogger()
 
+
 class UserService(BaseService):
     """
 
     """
 
-    def __init__(self, databaseConnection):
+    def __init__(self, daoRegistry):
         """
 
-        :param databaseConnection:
+        :param daoRegistry:
         """
-        super(UserService, self).__init__(databaseConnection)
-        self.dbConn = databaseConnection
+        super(UserService, self).__init__(daoRegistry)
 
     def registerUser(self, request, dto):
         """
@@ -36,7 +36,7 @@ class UserService(BaseService):
         try:
 
             phone_hash = Cryptography.hash(dto.phone)
-            result = self.dbConn.get_connection(UserModel).find_one({"phone_hash": phone_hash})
+            result = self.daoRegistry.usersDao.getUserByPhone(phone_hash)
 
             if not result:
                 userModel = UserModel()
@@ -46,11 +46,8 @@ class UserService(BaseService):
                 userModel.registration_date = datetime.datetime.utcnow()
                 userModel.devices = [{"device_id": dto.device_id, "is_valid": True}]
                 userModel.role = UserModel.NORMAL_USER
-                data = userModel.toDict()
-                data.pop("_id")
-                result = self.dbConn.get_connection(UserModel).insert_one(data)
-                user_id = result.inserted_id
 
+                user_id = self.daoRegistry.usersDao.createUser(userModel)
             else:
                 userModel = UserModel.fromDict(result)
 
@@ -58,11 +55,7 @@ class UserService(BaseService):
                     if deviceDict["device_id"] == dto.device_id:
                         return BaseError.USER_ALREADY_REGISTERED, status.HTTP_400_BAD_REQUEST
 
-                # we set the device as valid because we can't validate for now the phone number
-                device = {"device_id": dto.device_id, "is_valid": True}
-
-                self.dbConn.get_connection(UserModel).update({"_id": result["_id"]}, {"$addToSet": {"devices": device}})
-                user_id = userModel.id
+                user_id = self.daoRegistry.usersDao.addDevice(userModel.id, dto.device_id)
 
             # do not send an access token when we can validate the phone number
             tokenModel = TokenModel()
@@ -71,14 +64,12 @@ class UserService(BaseService):
             tokenModel.device = dto.device_id
             tokenModel.created_date = datetime.datetime.utcnow()
             tokenModel.last_ip_used = request.META["REMOTE_ADDR"]
-            tokenData = tokenModel.toDict()
-            tokenData.pop("_id")
-            self.dbConn.get_connection(TokenModel).insert(tokenData)
-            access_token = tokenModel.token
+
+            self.daoRegistry.tokensDao.create(tokenModel)
 
             resp = dict(response=dict())
             resp["response"]["user_id"] = Cryptography.encryptAES_CFB(str(userModel.id).encode())
-            resp["response"]["access_token"] = access_token
+            resp["response"]["access_token"] = tokenModel.token
 
             return resp, status.HTTP_200_OK
         except Exception as e:
